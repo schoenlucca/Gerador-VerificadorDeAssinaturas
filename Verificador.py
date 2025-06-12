@@ -34,7 +34,7 @@ def eh_primo(num):
             return False
     return True
 
-def euler_e(euler):
+def encontra_e(euler):
     # Tenta valores normalmente usados para e primeiro
     candidatos = [65537, 257, 17, 5, 3]
     for e in candidatos:

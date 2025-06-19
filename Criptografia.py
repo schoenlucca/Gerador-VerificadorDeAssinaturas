@@ -7,7 +7,7 @@ def divide_blocos(mensagem: str, n: int) -> list[bytes]:
     blocos = [mensagem_bytes[i:i + tamanho_bloco] for i in range(0, len(mensagem_bytes), tamanho_bloco)]
     return blocos
 
-def criptografa_mensagem(mensagem: str, chave_publica: tuple) -> list:
+def criptografa_mensagem(mensagem: str, chave_publica: tuple) -> list[int]:
     n, e = chave_publica
     blocos = divide_blocos(mensagem, n)
     mensagem_criptografada = []
@@ -29,7 +29,6 @@ def descriptografa_mensagem(mensagem_criptografada: list, chave_privada: tuple) 
     
     return mensagem_bytes.decode('utf-8')
 
-# Exemplo de uso
 chave_publica, chave_privada = calcula_chaves()
 print(chave_publica)
 print(chave_privada)

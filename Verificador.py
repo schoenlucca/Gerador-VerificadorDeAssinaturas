@@ -5,14 +5,6 @@
 import secrets
 
 # Função responsável por gerar um número de 1024 bits, usada para gerar p e q
-def gerador_de_1024_bits():
-    bit_length = secrets.randbits(10) + 1024  # aleatório, mas pelo menos 1024 bits
-    
-    num = secrets.randbits(bit_length)
-    num |= (1 << (bit_length - 1))
-    num |= 1
-    return num
-
 def gerador_de_1024_bits_primo():
     while True:
         num = secrets.randbits(1024) | (1 << 1023) | 1  # Garante 1024 bits e ímpar
@@ -89,7 +81,7 @@ def calcula_chaves():
     p = gerador_de_1024_bits_primo()
     q = gerador_de_1024_bits_primo()
     while p == q:
-        q = gerador_de_1024_bits()
+        q = gerador_de_1024_bits_primo()
     n = p * q
     euler = (p-1)*(q-1)
     e = encontra_e(euler)

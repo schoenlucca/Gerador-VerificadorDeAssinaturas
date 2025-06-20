@@ -1,5 +1,5 @@
 from Verificador import calcula_chaves
-from hashlib import sha256
+from hashlib import sha256,sha3_256
 import os
 
 def xor_bytes(a:bytes, b:bytes)->bytes:
@@ -49,6 +49,22 @@ def descriptografia_OAEP(mensagem_cifrada:bytes) -> bytes:
     mensagem = b"".join(chunks)
     return mensagem
 
+def gerar_assinatura_digital(mensagem:str,chave_privada:tuple)->int:
+    n,d = chave_privada 
+    hash_msg = sha3_256(mensagem.encode('utf-8')).digest()
+    hash_int = int.from_bytes(hash_msg, byteorder='big') % n
+    assinatura = pow(hash_int,d,n)
+    return assinatura
+
+def verificar_assinatura_digital(mensagem:str,assinatura:int, chave_publica:tuple)-> bool:
+    # Chave publica para descriptografia
+    n,e = chave_publica
+    assinatura_comparada = pow(assinatura,e,n)
+
+    hash_msg = sha3_256(mensagem.encode('utf-8')).digest()
+    hash_int = int.from_bytes(hash_msg,byteorder='big') % n
+    return assinatura_comparada == hash_int
+
 def divide_blocos(mensagem: str, n: int) -> list[bytes]:
     # Tamanho que cada bloco deve ter
     tamanho_bloco = int((n.bit_length() // 8) - 32 - 2)  
@@ -92,3 +108,6 @@ print(f"Mensagem criptografada: {criptografia}")
 
 descriptografado = descriptografa_mensagem(criptografia, chave_privada)
 print(f"Mensagem descriptografada: {descriptografado}")
+
+assinatura = gerar_assinatura_digital(mensagem+" bola",chave_privada)
+print(verificar_assinatura_digital(mensagem,assinatura,chave_publica))

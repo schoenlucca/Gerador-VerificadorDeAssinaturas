@@ -49,16 +49,18 @@ def descriptografia_OAEP(mensagem_cifrada:bytes) -> bytes:
     mensagem = b"".join(chunks)
     return mensagem
 
-def gerar_assinatura_digital(mensagem:str,chave_privada:tuple)->int:
+def gerar_assinatura_digital(mensagem:str,chave_privada:tuple)->tuple:
     n,d = chave_privada 
     hash_msg = sha3_256(mensagem.encode('utf-8')).digest()
     hash_int = int.from_bytes(hash_msg, byteorder='big') % n
     assinatura = pow(hash_int,d,n)
-    return assinatura
+    return (mensagem,assinatura)
 
-def verificar_assinatura_digital(mensagem:str,assinatura:int, chave_publica:tuple)-> bool:
+def verificar_assinatura_digital(assinatura_recebida:tuple, chave_publica:tuple)-> bool:
     # Chave publica para descriptografia
     n,e = chave_publica
+    assinatura = assinatura_recebida[1]
+    mensagem = assinatura_recebida[0]
     assinatura_comparada = pow(assinatura,e,n)
 
     hash_msg = sha3_256(mensagem.encode('utf-8')).digest()
@@ -100,14 +102,31 @@ def descriptografa_mensagem(mensagem_criptografada: list, chave_privada: tuple) 
     
     return mensagem_bytes.decode('utf-8',errors='replace')
 
-chave_publica, chave_privada = calcula_chaves()
-mensagem = "O território que atualmente forma o Brasil foi oficialmente"
+def enviar_pacote(mensagem:str,chave_privada:tuple,chave_publica:tuple)->tuple:
+    # HMAC = (assinatura,mensagem_criptografada)
+    mensagem_critptografada = criptografa_mensagem(mensagem,chave_publica)
+    assinatura = gerar_assinatura_digital(mensagem,chave_privada)
+    return (assinatura,mensagem_critptografada)
 
-criptografia = criptografa_mensagem(mensagem, chave_publica)
-print(f"Mensagem criptografada: {criptografia}")
+def receber_pacote(pacote:tuple,chave_privada_receptor:tuple, chave_publica_emissor:tuple)->bool:
+    assinatura = pacote[0]
+    mensagem_criptografada = pacote[1]
+    mensagem_original = descriptografa_mensagem(mensagem_criptografada,chave_privada_receptor)
+    if not verificar_assinatura_digital(assinatura,chave_publica_emissor):
+        print("Pacote pode ter sido modificado ou contaminado")
+        return False
+    return mensagem_original == assinatura[0]
 
-descriptografado = descriptografa_mensagem(criptografia, chave_privada)
-print(f"Mensagem descriptografada: {descriptografado}")
+chave_publica_A, chave_privada_A = calcula_chaves()  # Emissor
+chave_publica_B, chave_privada_B = calcula_chaves()  # Receptor
+mensagem = "Brasil pais do futbol"
 
-assinatura = gerar_assinatura_digital(mensagem+" bola",chave_privada)
-print(verificar_assinatura_digital(mensagem,assinatura,chave_publica))
+# Emissor 
+pacote = enviar_pacote(mensagem, chave_privada_A, chave_publica_B)
+
+# Receptor 
+try:
+    msg_recebida = receber_pacote(pacote, chave_privada_B, chave_publica_A)
+    print("Mensagem válida recebida:", msg_recebida)
+except ValueError as e:
+    print("Erro:", e)

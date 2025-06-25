@@ -1,6 +1,7 @@
 from Verificador import calcula_chaves
 from hashlib import sha256,sha3_256
 import os
+import base64
 
 def xor_bytes(a:bytes, b:bytes)->bytes:
     return bytes(x^y for x,y in zip(a,b))
@@ -54,18 +55,35 @@ def gerar_assinatura_digital(mensagem:str,chave_privada:tuple)->tuple:
     hash_msg = sha3_256(mensagem.encode('utf-8')).digest()
     hash_int = int.from_bytes(hash_msg, byteorder='big') % n
     assinatura = pow(hash_int,d,n)
-    return (mensagem,assinatura)
 
-def verificar_assinatura_digital(assinatura_recebida:tuple, chave_publica:tuple)-> bool:
+    # Formatação em BASE64
+    assinatura_bytes = assinatura.to_bytes((assinatura.bit_length() + 7) // 8, 'big')
+    
+    pacote = f"{mensagem}::{assinatura_bytes.hex()}".encode('utf-8')
+    
+    return base64.b64encode(pacote).decode('utf-8')
+
+def verificar_assinatura_digital(assinatura_recebida_64:str, chave_publica:tuple)-> tuple:
     # Chave publica para descriptografia
-    n,e = chave_publica
-    assinatura = assinatura_recebida[1]
-    mensagem = assinatura_recebida[0]
-    assinatura_comparada = pow(assinatura,e,n)
-
+    n, e = chave_publica
+    
+    # decodificação BASE64
+    try:
+        decoded = base64.b64decode(assinatura_recebida_64.encode('utf-8')).decode('utf-8')
+        mensagem, assinatura_hex = decoded.split("::")
+        assinatura_bytes = bytes.fromhex(assinatura_hex)
+    except:
+        return (None, False)
+    
+    # descriptografia da assinatura
+    assinatura = int.from_bytes(assinatura_bytes, byteorder='big')
+    hash_decifrado = pow(assinatura, e, n)
+    
+    # verificação 
     hash_msg = sha3_256(mensagem.encode('utf-8')).digest()
-    hash_int = int.from_bytes(hash_msg,byteorder='big') % n
-    return assinatura_comparada == hash_int
+    hash_int = int.from_bytes(hash_msg, byteorder='big') % n
+    
+    return (mensagem, hash_decifrado == hash_int)
 
 def divide_blocos(mensagem: str, n: int) -> list[bytes]:
     # Tamanho que cada bloco deve ter
@@ -80,6 +98,7 @@ def divide_blocos(mensagem: str, n: int) -> list[bytes]:
     return blocos
 
 def criptografa_mensagem(mensagem: str, chave_publica: tuple) -> list[int]:
+    # Criptografia com RSA
     n, e = chave_publica
     blocos = divide_blocos(mensagem, n)
     mensagem_criptografada = []
@@ -88,9 +107,11 @@ def criptografa_mensagem(mensagem: str, chave_publica: tuple) -> list[int]:
         m = int.from_bytes(bloco, byteorder='big')
         c = pow(m, e, n)
         mensagem_criptografada.append(c)
+
     return mensagem_criptografada
 
 def descriptografa_mensagem(mensagem_criptografada: list, chave_privada: tuple) -> str:
+    # Descriptografia com RSA
     n, d = chave_privada
     mensagem_bytes = bytearray()
     for c in mensagem_criptografada:
@@ -109,13 +130,15 @@ def enviar_pacote(mensagem:str,chave_privada:tuple,chave_publica:tuple)->tuple:
     return (assinatura,mensagem_critptografada)
 
 def receber_pacote(pacote:tuple,chave_privada_receptor:tuple, chave_publica_emissor:tuple)->bool:
-    assinatura = pacote[0]
-    mensagem_criptografada = pacote[1]
+    assinatura_b64, mensagem_criptografada = pacote
     mensagem_original = descriptografa_mensagem(mensagem_criptografada,chave_privada_receptor)
-    if not verificar_assinatura_digital(assinatura,chave_publica_emissor):
-        print("Pacote pode ter sido modificado ou contaminado")
-        return False
-    return mensagem_original == assinatura[0]
+    mensagem_ass, valido = verificar_assinatura_digital(assinatura_b64, chave_publica_emissor)
+    if not valido:
+        raise ValueError("Assinatura inválida! Pacote pode ter sido alterado")
+    if mensagem_original != mensagem_ass:
+        raise ValueError("Mensagem descriptografada não coincide com a assinada")
+    
+    return mensagem_original
 
 chave_publica_A, chave_privada_A = calcula_chaves()  # Emissor
 chave_publica_B, chave_privada_B = calcula_chaves()  # Receptor
@@ -123,6 +146,7 @@ mensagem = "Brasil pais do futbol"
 
 # Emissor 
 pacote = enviar_pacote(mensagem, chave_privada_A, chave_publica_B)
+print(f"Enviando o pacote: {pacote}")
 
 # Receptor 
 try:
